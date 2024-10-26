@@ -22,3 +22,7 @@ variable "tags_ec2" {
   type        = map(string)
   default     = {}
 }
+
+variable "user_data" {
+  type        = string
+}

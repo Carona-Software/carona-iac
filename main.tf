@@ -143,14 +143,20 @@ module "elastic_ip_ec2" {
 
 module "ec2_publica" {
     source = "./modules/ec2"
-    ami = "ami-0e86e20dae9224db8"
-    instance_type = "t2.large"
+    ami = "ami-0866a3c8686eaeeba"
+    instance_type = "i3.large"  
     key_name = module.key_par.key_name
-    vpc_security_group_ids = [module.sg_publico.id]    
+    vpc_security_group_ids = [module.sg_publico.id]
     subnet_id = module.subnet_publica.id
     tags_ec2 = {
         Name = "ec2_publica_iac"
     }
+    
+    user_data = null
+
+    depends_on = [
+        module.ec2_privada
+    ]
 }
 
 module "key_par" {
@@ -195,12 +201,110 @@ module "sg_privado" {
 
 module "ec2_privada" {
     source = "./modules/ec2"
-    ami = "ami-0e86e20dae9224db8"
-    instance_type = "t2.large"
+    ami = "ami-0866a3c8686eaeeba"
+    instance_type = "i3.large"
     key_name = module.key_par.key_name
     vpc_security_group_ids = [module.sg_privado.id]    
     subnet_id = module.subnet_privada.id
     tags_ec2 = {
         Name = "ec2_privada_iac"
     }
+
+    user_data = templatefile("./modules/ec2/automatizacao_back.sh", {
+        private_ip = module.ec2_banco.private_ip
+    })
+
+    depends_on = [
+        module.ec2_banco
+    ]
+}
+
+module "ec2_privada_2" {
+    source = "./modules/ec2"
+    ami = "ami-0866a3c8686eaeeba"
+    instance_type = "i3.large"
+    key_name = module.key_par.key_name
+    vpc_security_group_ids = [module.sg_privado.id]    
+    subnet_id = module.subnet_privada.id
+    tags_ec2 = {
+        Name = "ec2_privada_iac_2"
+    }
+
+    user_data = templatefile("./modules/ec2/automatizacao_back.sh", {
+        private_ip = module.ec2_banco.private_ip
+    })
+
+    depends_on = [
+        module.ec2_banco
+    ]
+}
+
+module "sg_banco" {
+    source = "./modules/security_group"
+    name = "sg_banco"
+    description = "security group para ec2 do banco"
+    vpc_id = module.vpc.id
+    ingress = [{
+        from_port = 3306
+        to_port = 3306
+        protocol = "tcp"
+        cidr_blocks = ["10.0.0.128/25"]
+        description = ""
+        ipv6_cidr_blocks = []
+        prefix_list_ids = []
+        security_groups = []
+        self = false
+    },
+    {
+        from_port = 8080
+        to_port = 8080
+        protocol = "tcp"
+        cidr_blocks = ["10.0.0.128/25"]
+        description = ""
+        ipv6_cidr_blocks = []
+        prefix_list_ids = []
+        security_groups = []
+        self = false
+    },
+    {
+        from_port = 22
+        to_port = 22
+        protocol = "tcp"
+        cidr_blocks = ["10.0.0.0/25"]
+        description = ""
+        ipv6_cidr_blocks = []
+        prefix_list_ids = []
+        security_groups = []
+        self = false
+    }]
+
+    egress = [{
+        from_port = 0
+        to_port = 0
+        protocol = "-1"
+        cidr_blocks        = ["0.0.0.0/0"]
+        description        = "Allow all outbound traffic"
+        ipv6_cidr_blocks   = [] 
+        prefix_list_ids    = []
+        security_groups    = []
+        self               = false
+    }]
+
+    tags_security_group = {
+        Name = "private_security_group_banco"
+    }
+}
+
+module "ec2_banco" {
+    source = "./modules/ec2"
+    ami = "ami-0866a3c8686eaeeba"
+    instance_type = "i3.large"
+    key_name = module.key_par.key_name
+    vpc_security_group_ids = [module.sg_banco.id]
+    subnet_id = module.subnet_privada.id
+    tags_ec2 = {
+        Name = "ec2_privada_banco_iac"
+    }
+
+    user_data = file("./modules/ec2/automatizacao_banco.sh")
 }
